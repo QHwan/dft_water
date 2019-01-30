@@ -1,0 +1,345 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "hard_sphere.h"
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+
+double trapz(double *func, double rMin, double rMax, int N) {
+	int i;
+	double o = 0.;
+	for (i=0; i<N; i++) {
+		o += 2*func[i];
+		if (i==0 || i==N-1) {
+			o -= func[i];
+		}
+	}
+
+	if (N==1) {
+		o = 0.; 
+	}
+	else { 
+		o *= (rMax-rMin)/(2*(N-1));
+	}
+
+	return o;
+}
+
+double *c1HS(double *rVec, double *denVec, double R, double d, double dr) {
+	int i, j;
+	int rpMaxIndex, rpMinIndex, N, nGrids;
+	double r, rp, rpMax, rpMin;
+	double n2, n3, v2, phi2, phi3, phiv2;
+	double den;
+	double *n2Vec, *n3Vec, *v2Vec;
+	double *phi2Vec, *phi3Vec, *phiv2Vec;
+	double *c1HSVec;
+	double *n2Func, *n3Func, *v2Func;
+
+	nGrids = (int)(R/dr)+1;
+	n2Vec = (double*)malloc(nGrids*sizeof(double));
+	n3Vec = (double*)malloc(nGrids*sizeof(double));
+	v2Vec = (double*)malloc(nGrids*sizeof(double));
+	phi2Vec = (double*)malloc(nGrids*sizeof(double));
+	phi3Vec = (double*)malloc(nGrids*sizeof(double));
+	phiv2Vec = (double*)malloc(nGrids*sizeof(double));
+	c1HSVec = (double*)malloc(nGrids*sizeof(double));
+	for (i=0; i<nGrids; i++) {
+		n2Vec[i] = 0;
+		n3Vec[i] = 0;
+		v2Vec[i] = 0;
+		phi2Vec[i] = 0;
+		phi3Vec[i] = 0;
+		phiv2Vec[i] = 0;
+	}
+
+
+	for (i=1; i<nGrids; i++) {
+		r = rVec[i];
+		if (r >= d/2) {
+			rpMin = r-d/2; }
+		else if (r < d/2) {
+			rpMin = d/2-r; }
+		rpMax = r+d/2;
+		if (rpMax > R) {
+			rpMax = R; }
+
+		rpMinIndex = (int)(rpMin/dr);
+		rpMaxIndex = (int)(rpMax/dr);
+		N = (rpMaxIndex-rpMinIndex)+1;
+
+		n2Func = (double*)malloc(N*sizeof(double));
+		n3Func = (double*)malloc(N*sizeof(double));
+		v2Func = (double*)malloc(N*sizeof(double));
+		for (j=0; j<N; j++) {
+			den = denVec[rpMinIndex+j];
+			rp = rVec[rpMinIndex+j];
+			n2Func[j] = den*rp;
+			n3Func[j] = den*rp*((0.25*(d*d))-((r-rp)*(r-rp)));
+			v2Func[j] = den*rp*(r*r-rp*rp+(d*d/4));
+		}
+
+		n2 = trapz(n2Func,rpMin,rpMax,N);
+		n3 = trapz(n3Func,rpMin,rpMax,N);
+		v2 = trapz(v2Func,rpMin,rpMax,N);
+
+		free(n2Func);
+		free(n3Func);
+		free(v2Func);
+
+		n2Vec[i] += n2*(M_PI*d/r);
+		n3Vec[i] += n3*(M_PI/r);
+		v2Vec[i] += v2*(M_PI/(r*r));
+
+	}
+
+	// n3Vec calculate alone
+	for (i=0; i<(int)(d/2/dr); i++) {
+		r = rVec[i];
+		rpMin = 0.;
+		rpMax = d/2 - r;
+		rpMinIndex = (int)(rpMin/dr);
+		rpMaxIndex = (int)(rpMax/dr);
+		N = (rpMaxIndex-rpMinIndex)+1;
+
+		n3Func = (double*)malloc(N*sizeof(double));
+		for (j=0; j<N; j++) {
+			den = denVec[rpMinIndex+j];
+			rp = rVec[rpMinIndex+j];
+			n3Func[j] = 2*(rp*rp)*den;
+		}
+		n3 = trapz(n3Func,rpMin,rpMax,N);
+
+		free(n3Func);
+
+		n3Vec[i] += n3*4*M_PI;
+	}
+
+	n2Vec[0] = n2Vec[1];
+	v2Vec[0] = v2Vec[1];
+
+
+	// phi2Vec time
+	for (i=0; i<nGrids; i++) {
+		phi2Vec[i] = 0;
+		phi3Vec[i] = 0;
+		phiv2Vec[i] = 0;
+	}
+
+	for (i=1; i<nGrids-(int)(d/2/dr)-1; i++) {
+		r = rVec[i];
+
+		if (r >= d/2) {
+			rpMin = (r-d/2); }
+		else if (r < d/2) {
+			rpMin = (d/2-r); }
+		rpMax = r+d/2;
+		if (rpMax > R) {
+			rpMax = R; }
+		rpMinIndex = (int)(rpMin/dr);
+		rpMaxIndex = (int)(rpMax/dr);
+		N = (rpMaxIndex-rpMinIndex)+1;
+
+		n2Func = (double*)malloc(N*sizeof(double));
+		n3Func = (double*)malloc(N*sizeof(double));
+		v2Func = (double*)malloc(N*sizeof(double));
+
+		for (j=0; j<N; j++) {
+			rp = rVec[rpMinIndex+j];
+			n2 = n2Vec[rpMinIndex+j];
+			n3 = n3Vec[rpMinIndex+j];
+			v2 = v2Vec[rpMinIndex+j];
+			n2Func[j] = rp*fphi2(n2,n3,v2,d);
+			n3Func[j] = rp*((d*d/4)-((r-rp)*(r-rp)))*fphi3(n2,n3,v2,d);
+			v2Func[j] = rp*(r*r-rp*rp+((d*d)/4))*fphiv2(n2,n3,v2,d);
+		}
+		phi2 = trapz(n2Func,rpMin,rpMax,N);
+		phi3 = trapz(n3Func,rpMin,rpMax,N);
+		phiv2 = trapz(v2Func,rpMin,rpMax,N);
+
+		free(n2Func);
+		free(n3Func);
+		free(v2Func);
+			
+		phi2Vec[i] += phi2*(M_PI*d/r);
+		phi3Vec[i] += phi3*(M_PI/r);
+		phiv2Vec[i] += phiv2*(M_PI/(r*r));
+	}
+	
+	// phi3Vec calculate alone
+	for (i=0; i<(int)(d/2/dr); i++) {
+		r = rVec[i];
+		
+		rpMin = 0;
+		rpMax = d/2 - r;
+		rpMinIndex = (int)(rpMin/dr);
+		rpMaxIndex = (int)(rpMax/dr);
+		N = (rpMaxIndex-rpMinIndex)+1;
+
+		n3Func = (double*)malloc(N*sizeof(double));
+
+		for (j=0; j<N; j++) {
+			rp = rVec[rpMinIndex+j];
+			n2 = n2Vec[rpMinIndex+j];
+			n3 = n3Vec[rpMinIndex+j];
+			v2 = v2Vec[rpMinIndex+j];
+
+			n3Func[j] = (rp*rp)*fphi3(n2,n3,v2,d);
+		}
+		phi3 = trapz(n3Func,rpMin,rpMax,N);
+
+		free(n3Func);
+
+		phi3Vec[i] += phi3*4*M_PI;
+	}
+
+	for (i=0; i<nGrids; i++) {
+		c1HSVec[i] = phi2Vec[i]+phi3Vec[i]+phiv2Vec[i];
+	}
+
+	free(n2Vec);
+	free(n3Vec);
+	free(v2Vec);
+	free(phi2Vec);
+	free(phi3Vec);
+	free(phiv2Vec);
+
+	return c1HSVec;
+}
+	 /*
+cdef uAtt(double r, double sig, double eps, double rc):
+	cdef rpMin = (2**(1./6.))*sig
+	cdef uAtt = 0.
+	#if r<rpMin:
+	#	uAtt = -1.*eps
+	if r>=rpMin and r<rc:
+		uAtt = 4*eps*((sig/r)**12-(sig/r)**6)
+	else:
+		uAtt = 0.
+	return uAtt
+'''
+*/	
+
+
+int main()
+{
+	double rhob, eta, mu;
+	double R, T, d, r, dr, q, tol;
+	int nGrids, again, step;
+	int i, j, k, N;
+	double den, rp;
+	double sig, eps, rc;
+	double max;
+
+	rhob = 0.5;
+	T = 0.; // reduced unit
+	sig = 1.;
+	eps = 0.;
+	//beta = 1/(eps*T) 
+	//eps *= beta  # energy reduced unit
+	rc = 2.5*sig;
+	eta = (M_PI*rhob)/6;
+	//mu = eta*(8-9*eta+3*eta*eta)/((1-eta)**3) + (-64*eta/(3*T))
+	mu = eta*(8-9*eta+3*eta*eta)/(pow(1-eta,3.0));
+
+	printf("mu = %f\n",mu);
+
+	// Initial setting , all length unit is dma
+	R = 5.;		// R is size of slab system
+	d = (1+0.2977*T)*sig/(1+0.33163*T+0.00104771*T*T); 	// dma is unit length
+	dr = 0.01;	// dr is grid step, here, 0.01*d
+	nGrids = (int)(R/dr)+1;
+	q = 0.01;
+
+	tol = 1e-3;
+	again = 0;
+	step = 0;
+
+	double *rVec;
+	double *denOutVec, *denInVec, *denVec;
+	double *c1HSVec;
+	double *cAttVec;
+	double *diffVec;
+	double *tolVec;
+
+	rVec = (double *)malloc(nGrids*sizeof(double));
+	for (i=0; i<nGrids; i++) { rVec[i] = 0; }
+	denVec = (double*)malloc(nGrids*sizeof(double));
+	denInVec = (double*)malloc(nGrids*sizeof(double));
+	denOutVec = (double*)malloc(nGrids*sizeof(double));
+	c1HSVec = (double*)malloc(nGrids*sizeof(double));
+	tolVec = (double*)malloc(nGrids*sizeof(double));
+	for (i=0; i<nGrids; i++) { 
+		denVec[i] = 0;
+		denInVec[i] = 0; 
+		denOutVec[i] = 0;
+		c1HSVec[i] = 0;
+		tolVec[i] = 0;
+	}
+
+	// DFT start
+	for (i=0; i<(nGrids-(int)(d/2/dr)); i++) {
+		denInVec[i] += rhob;
+	}
+	for (i=0; i<nGrids; i++) {
+		rVec[i] += dr*i;
+	}
+
+
+	// Main DFT loop
+	while (again < 1) {
+		step += 1;
+
+		for (i=0; i<nGrids; i++) {
+			denVec[i] = denInVec[i];
+			denInVec[i] = 0;
+		}
+
+		c1HSVec = c1HS(rVec, denVec, R, d, dr);
+
+		for (i=1; i<nGrids-(int)(sig/2/dr)-1; i++) {
+			denOutVec[i] = rhob*exp(mu-c1HSVec[i]);
+		}
+		denOutVec[0] = denOutVec[1];
+
+		for (i=0; i<nGrids; i++) { tolVec[i] = 0; }
+		for (i=0; i<nGrids-(int)(sig/2/dr)-1; i++) {
+			tolVec[i] = fabs(denOutVec[i]-denVec[i]);
+		}
+
+		max = 0;
+		for (i=0; i<nGrids; i++) {
+			if (tolVec[i] >= max) {
+				max = tolVec[i];
+			}
+		}
+		printf("%d \t %.5f \n", step, max);
+
+		if (max <= tol){
+			FILE *f = fopen("test.xvg", "w");
+			if(f==NULL) { printf("File error!"); }
+			else {
+				for (i=0; i<nGrids; i++) {
+					fprintf(f, "%d \t %f \n", i, denOutVec[i]/rhob);
+				}
+			}
+			fclose(f);
+			again = 1;
+		}
+		else {
+			for (i=0; i<nGrids; i++) {
+				denInVec[i] = denVec[i]*(1.0-q) + q*denOutVec[i];
+			}
+		}
+
+	}
+
+	free(rVec);
+	free(denVec);
+	free(denInVec);
+	free(denOutVec);
+	free(c1HSVec);
+	free(tolVec);
+}
+

@@ -1,0 +1,18 @@
+System	2
+
+Size	10.000
+dr	0.01
+
+Ensemble	UVT
+den	0.5
+N	300
+
+HardSphere	MFMT
+
+Dispersion	No
+Sig	1.0
+Temperature	0.7
+RCut	2.5
+
+q	0.01
+Tolerance	1E-3

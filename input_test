@@ -1,0 +1,22 @@
+System	1	
+R	100
+Ri	50.
+dr	0.01
+Image	1	
+Step	1
+mu	-3.6685622	
+Ensemble	UVT	
+M	1	
+Ma	1.0	
+Density	0.7	
+Pressure	0.3689787968	0.0311019099	
+HardSphere	MFMT	
+Dispersion	LJ	
+Sig	1.0	
+T	2.5	
+T_assoc	0.2	
+RCut	5.0	
+q	0.05	
+Tolerance	0.00001	
+Wall	LJ	
+WallT	2.0	

@@ -1,0 +1,20 @@
+System	1	
+R	15.0
+Ri	6.0	
+dr	0.01	
+Image	1	
+Step	0	
+mu	-3.8508
+Ensemble	UVT	
+M	1	
+Ma	0	
+Density	0.6327	0.0287
+Pressure	0.3689787968	0.0311019099	
+HardSphere	MFMT	
+Dispersion	LJ	
+Sig	1.0	
+T	1.0
+T_assoc	0.2	
+RCut	2.5	
+q	0.05	
+Tolerance	1.e-5	
